@@ -2,6 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+  timeout: 15000,
 });
 
 api.interceptors.request.use((config) => {
@@ -12,9 +13,31 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// If the token is rejected, the stored session is dead. Clear it and bounce to
+// the login page so the UI never sits there looking "logged in" but empty.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+    const isAuthAttempt = url.includes('/api/auth/login') || url.includes('/api/auth/register');
+
+    if (status === 401 && !isAuthAttempt) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.assign('/login');
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 // Auth
 export const login = (data) => api.post('/api/auth/login', data);
 export const register = (data) => api.post('/api/auth/register', data);
+export const getMe = () => api.get('/api/auth/me');
 export const changePassword = (data) => api.put('/api/auth/change-password', data);
 
 // Equipment

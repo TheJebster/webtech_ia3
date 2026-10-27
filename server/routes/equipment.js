@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Equipment = require('../models/Equipment');
 const { protect, admin } = require('../middleware/auth');
+const { validObjectId } = require('../middleware/validObjectId');
 
 const router = express.Router();
 
@@ -26,7 +27,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 // GET /api/equipment/:id
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', protect, validObjectId('Equipment'), async (req, res) => {
   try {
     const equipment = await Equipment.findById(req.params.id);
     if (!equipment) {
@@ -67,7 +68,7 @@ router.post(
 );
 
 // PUT /api/equipment/:id
-router.put('/:id', protect, admin, async (req, res) => {
+router.put('/:id', protect, admin, validObjectId('Equipment'), async (req, res) => {
   try {
     const equipment = await Equipment.findByIdAndUpdate(
       req.params.id,
@@ -84,7 +85,7 @@ router.put('/:id', protect, admin, async (req, res) => {
 });
 
 // DELETE /api/equipment/:id
-router.delete('/:id', protect, admin, async (req, res) => {
+router.delete('/:id', protect, admin, validObjectId('Equipment'), async (req, res) => {
   try {
     const equipment = await Equipment.findByIdAndDelete(req.params.id);
     if (!equipment) {

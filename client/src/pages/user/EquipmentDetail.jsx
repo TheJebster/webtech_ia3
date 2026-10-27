@@ -68,6 +68,9 @@ const EquipmentDetail = () => {
       });
       setRentalSuccess('Rental request submitted successfully!');
       setRentalForm({ eventName: '', startDate: '', endDate: '', quantity: 1 });
+      // Refresh so the UI reflects the latest stock from the database.
+      const refreshed = await getEquipmentById(id);
+      setEquipment(refreshed.data);
       setTimeout(() => {
         setShowModal(false);
         setRentalSuccess('');
@@ -123,14 +126,14 @@ const EquipmentDetail = () => {
                 </Col>
                 <Col xs={4} className="text-center">
                   <div className="text-muted small">Status</div>
-                  <Badge bg={equipment.available ? 'success' : 'danger'} className="fs-6">
-                    {equipment.available ? 'Available' : 'Unavailable'}
+                  <Badge bg={equipment.available && equipment.quantity > 0 ? 'success' : 'danger'} className="fs-6">
+                    {equipment.available && equipment.quantity > 0 ? 'Available' : 'Unavailable'}
                   </Badge>
                 </Col>
               </Row>
             </Card.Body>
           </Card>
-          {equipment.available && (
+          {equipment.available && equipment.quantity > 0 && (
             <Button variant="primary" size="lg" className="mt-3 w-100" onClick={() => setShowModal(true)}>
               <FaCalendarAlt className="me-2" /> Rent This Equipment
             </Button>

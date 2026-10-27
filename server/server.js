@@ -2,6 +2,7 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 dotenv.config(); // fallback to cwd or pre-set env vars
@@ -38,6 +39,21 @@ app.use(
 );
 app.use(express.json());
 
+// Health check — useful for confirming the DB link from the browser or Vercel.
+app.get('/api/health', async (req, res) => {
+  const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  try {
+    await connectDB();
+    res.json({
+      status: 'ok',
+      db: states[mongoose.connection.readyState] || 'unknown',
+      dbName: mongoose.connection.name,
+    });
+  } catch (error) {
+    res.status(503).json({ status: 'error', db: 'disconnected', message: error.message });
+  }
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/equipment', equipmentRoutes);
@@ -51,9 +67,14 @@ app.get('/', (req, res) => {
 // Connect DB and start server (local dev only)
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
-  connectDB().then(() => {
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  });
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    })
+    .catch(() => {
+      console.error('Server not started: database connection failed.');
+      process.exit(1);
+    });
 }
 
 module.exports = app;

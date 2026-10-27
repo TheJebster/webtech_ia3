@@ -18,6 +18,8 @@ const EquipmentCatalog = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let ignore = false;
+
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -25,14 +27,29 @@ const EquipmentCatalog = () => {
         if (search) params.search = search;
         if (catFilter) params.category = catFilter;
         const res = await getEquipment(params);
-        setEquipment(res.data);
-      } catch {
-        setError('Failed to load equipment');
+        // Ignore out-of-order responses from a previous keystroke.
+        if (!ignore) {
+          setEquipment(res.data);
+          setError('');
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(
+            err.response?.data?.message ||
+            (err.code === 'ERR_NETWORK'
+              ? 'Cannot reach the API. Is the backend running on port 5000?'
+              : 'Failed to load equipment')
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) setLoading(false);
       }
     };
     fetchData();
+
+    return () => {
+      ignore = true;
+    };
   }, [search, catFilter]);
 
   return (
@@ -91,7 +108,11 @@ const EquipmentCatalog = () => {
                   </Card.Text>
                   <div className="d-flex justify-content-between align-items-center mt-auto">
                     <span className="fw-bold text-primary fs-5">${item.pricePerDay}/day</span>
-                    <span className="text-muted">{item.quantity} available</span>
+                    <span className={item.available && item.quantity > 0 ? 'text-muted' : 'text-danger'}>
+                      {item.available && item.quantity > 0
+                        ? `${item.quantity} available`
+                        : 'Unavailable'}
+                    </span>
                   </div>
                 </Card.Body>
               </Card>

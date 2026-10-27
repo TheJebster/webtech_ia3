@@ -16,7 +16,7 @@ const UserManagement = () => {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refreshUser } = useAuth();
 
   const fetchData = async () => {
     try {
@@ -46,6 +46,10 @@ const UserManagement = () => {
         const data = { name: form.name, email: form.email, role: form.role };
         if (form.password) data.password = form.password;
         await updateUser(editing, data);
+        // If the admin edited their own record, refresh the navbar/context.
+        if (editing === currentUser._id) {
+          await refreshUser();
+        }
       } else {
         await createUser(form);
       }

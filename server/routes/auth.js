@@ -94,6 +94,17 @@ router.post(
   }
 );
 
+// GET /api/auth/me
+// Lets the client verify a stored token and refresh its user context.
+router.get('/me', protect, async (req, res) => {
+  res.json({
+    _id: req.user._id,
+    name: req.user.name,
+    email: req.user.email,
+    role: req.user.role,
+  });
+});
+
 // PUT /api/auth/change-password
 router.put(
   '/change-password',
