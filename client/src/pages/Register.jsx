@@ -22,8 +22,19 @@ const Register = () => {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address (e.g. user@example.com)');
+      return;
+    }
+
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (!/[0-9]/.test(password) && !/[!@#$%^&*]/.test(password)) {
+      setError('Password must include at least one number or special character');
       return;
     }
 
@@ -37,7 +48,12 @@ const Register = () => {
       await registerUser(name, email, password);
       navigate('/equipment');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(
+        err.response?.data?.message ||
+        (err.code === 'ERR_NETWORK'
+          ? 'Network error: Cannot reach server. Please ensure the backend is running.'
+          : 'Registration failed')
+      );
     } finally {
       setLoading(false);
     }

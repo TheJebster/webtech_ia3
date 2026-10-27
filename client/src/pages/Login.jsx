@@ -25,7 +25,12 @@ const Login = () => {
       const user = await loginUser(email, password);
       navigate(user.role === 'admin' ? '/admin/dashboard' : '/equipment');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(
+        err.response?.data?.message ||
+        (err.code === 'ERR_NETWORK'
+          ? 'Network error: Cannot reach server. Please ensure the backend is running on port 5000.'
+          : 'Login failed. Please check your credentials.')
+      );
     } finally {
       setLoading(false);
     }

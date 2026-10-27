@@ -15,7 +15,27 @@ const rentalRoutes = require('./routes/rentals');
 const app = express();
 
 // Middleware
-app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(',').map((o) => o.trim())
+  : ['*'];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes('*') ||
+        allowedOrigins.includes(origin) ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:')
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error('CORS policy: origin not allowed'));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Routes
