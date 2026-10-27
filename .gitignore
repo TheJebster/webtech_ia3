@@ -21,3 +21,6 @@ Thumbs.db
 PROGRESS.md
 HANDOFF.md
 TODO.md
+AGENT_*.md
+*.handoff.md
+handoff/
