@@ -39,9 +39,10 @@ const AppNavbar = () => {
           <Nav>
             {user ? (
               <>
-                <Nav.Link as={Link} to="/change-password">
+                <Nav.Link as={Link} to="/profile">
                   {user.name}
                 </Nav.Link>
+                <Nav.Link as={Link} to="/change-password">Password</Nav.Link>
                 <Button variant="outline-light" size="sm" onClick={handleLogout}>
                   <FaSignOutAlt className="me-1" /> Logout
                 </Button>

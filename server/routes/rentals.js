@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { body, validationResult } = require('express-validator');
 const Rental = require('../models/Rental');
 const Equipment = require('../models/Equipment');
@@ -17,6 +18,83 @@ const syncAvailability = async (equipmentId) => {
     await eq.save();
   }
 };
+
+// GET /api/rentals/stats — aggregation-powered dashboard analytics (admin only)
+router.get('/stats', protect, admin, async (req, res) => {
+  try {
+    const [byStatus, revenueByCategory, monthly, totals] = await Promise.all([
+      Rental.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+
+      Rental.aggregate([
+        { $match: { status: { $in: ['approved', 'returned'] } } },
+        {
+          $lookup: {
+            from: 'equipment',
+            localField: 'equipment',
+            foreignField: '_id',
+            as: 'equipmentDoc',
+          },
+        },
+        { $unwind: '$equipmentDoc' },
+        {
+          $group: {
+            _id: '$equipmentDoc.category',
+            revenue: { $sum: '$totalPrice' },
+            bookings: { $sum: 1 },
+          },
+        },
+        { $sort: { revenue: -1 } },
+      ]),
+
+      Rental.aggregate([
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+            bookings: { $sum: 1 },
+            revenue: {
+              $sum: {
+                $cond: [{ $in: ['$status', ['approved', 'returned']] }, '$totalPrice', 0],
+              },
+            },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+
+      Rental.aggregate([
+        {
+          $group: {
+            _id: null,
+            rentals: { $sum: 1 },
+            revenue: {
+              $sum: {
+                $cond: [{ $in: ['$status', ['approved', 'returned']] }, '$totalPrice', 0],
+              },
+            },
+            pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+          },
+        },
+      ]),
+    ]);
+
+    res.json({
+      totals: {
+        rentals: totals[0]?.rentals || 0,
+        revenue: totals[0]?.revenue || 0,
+        pending: totals[0]?.pending || 0,
+      },
+      byStatus: byStatus.map((s) => ({ status: s._id, count: s.count })),
+      revenueByCategory: revenueByCategory.map((c) => ({
+        category: c._id,
+        revenue: c.revenue,
+        bookings: c.bookings,
+      })),
+      monthly: monthly.map((m) => ({ month: m._id, bookings: m.bookings, revenue: m.revenue })),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // GET /api/rentals
 router.get('/', protect, async (req, res) => {
@@ -88,6 +166,27 @@ router.post(
       }
 
       const totalPrice = quantity * equipment.pricePerDay * days;
+
+      // Date-conflict guard: pending requests for overlapping dates have not
+      // been deducted from stock yet, so account for them here.
+      const overlapping = await Rental.aggregate([
+        {
+          $match: {
+            equipment: new mongoose.Types.ObjectId(equipmentId),
+            status: 'pending',
+            startDate: { $lte: end },
+            endDate: { $gte: start },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$quantity' } } },
+      ]);
+
+      const pendingForDates = overlapping[0]?.total || 0;
+      if (pendingForDates + quantity > equipment.quantity) {
+        return res.status(400).json({
+          message: `Only ${Math.max(equipment.quantity - pendingForDates, 0)} unit(s) of ${equipment.name} are free for those dates`,
+        });
+      }
 
       const rental = await Rental.create({
         user: req.user._id,

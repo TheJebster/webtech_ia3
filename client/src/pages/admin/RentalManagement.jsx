@@ -1,36 +1,29 @@
-import { useState, useEffect } from 'react';
 import {
   Container, Table, Alert, Spinner, Badge, Form, Button,
 } from 'react-bootstrap';
 import { FaTrash } from 'react-icons/fa';
 import { getRentals, updateRentalStatus, deleteRental } from '../../services/api';
+import useLiveQuery from '../../hooks/useLiveQuery';
 
 const statusColors = { pending: 'warning', approved: 'success', returned: 'info', cancelled: 'danger' };
 
 const RentalManagement = () => {
-  const [rentals, setRentals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const fetchData = async () => {
-    try {
+  const { data, error, loading, lastUpdated, refresh } = useLiveQuery(
+    async () => {
       const res = await getRentals();
-      setRentals(res.data);
-    } catch {
-      setError('Failed to load rentals');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return res.data;
+    },
+    { interval: 5000 }
+  );
 
-  useEffect(() => { fetchData(); }, []);
+  const rentals = data || [];
 
   const handleStatusChange = async (id, status) => {
     try {
       await updateRentalStatus(id, status);
-      fetchData();
-    } catch {
-      setError('Failed to update rental status');
+      refresh({ silent: true });
+    } catch (err) {
+      window.alert(err.response?.data?.message || 'Failed to update rental status');
     }
   };
 
@@ -38,9 +31,9 @@ const RentalManagement = () => {
     if (!window.confirm('Are you sure you want to delete this rental?')) return;
     try {
       await deleteRental(id);
-      fetchData();
-    } catch {
-      setError('Failed to delete rental');
+      refresh({ silent: true });
+    } catch (err) {
+      window.alert(err.response?.data?.message || 'Failed to delete rental');
     }
   };
 
@@ -48,8 +41,15 @@ const RentalManagement = () => {
 
   return (
     <Container className="mt-4">
-      <h2 className="mb-3">Rental Management</h2>
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
+      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 className="mb-0">Rental Management</h2>
+        <small className="text-muted">
+          <span className="live-dot me-2" />
+          Live · updated {lastUpdated ? lastUpdated.toLocaleTimeString() : '—'}
+        </small>
+      </div>
+
+      {error && <Alert variant="danger">{error}</Alert>}
 
       <Table striped bordered hover responsive>
         <thead className="table-dark">

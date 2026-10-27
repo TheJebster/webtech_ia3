@@ -1,60 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Container, Row, Col, Card, Badge, Spinner, Alert, InputGroup, FormControl, Form,
 } from 'react-bootstrap';
 import { FaSearch } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { getEquipment } from '../../services/api';
+import useLiveQuery from '../../hooks/useLiveQuery';
 
 const CATEGORIES = ['Audio', 'Lighting', 'Furniture', 'Structures', 'Visual', 'Decor'];
 const categoryEmojis = { Audio: '🔊', Lighting: '💡', Furniture: '🪑', Structures: '⛺', Visual: '📽', Decor: '🎉' };
 
 const EquipmentCatalog = () => {
-  const [equipment, setEquipment] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    let ignore = false;
+  const { data, error, loading, lastUpdated } = useLiveQuery(
+    async () => {
+      const params = {};
+      if (search) params.search = search;
+      if (catFilter) params.category = catFilter;
+      const res = await getEquipment(params);
+      return res.data;
+    },
+    { interval: 5000, deps: [search, catFilter] }
+  );
 
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const params = {};
-        if (search) params.search = search;
-        if (catFilter) params.category = catFilter;
-        const res = await getEquipment(params);
-        // Ignore out-of-order responses from a previous keystroke.
-        if (!ignore) {
-          setEquipment(res.data);
-          setError('');
-        }
-      } catch (err) {
-        if (!ignore) {
-          setError(
-            err.response?.data?.message ||
-            (err.code === 'ERR_NETWORK'
-              ? 'Cannot reach the API. Is the backend running on port 5000?'
-              : 'Failed to load equipment')
-          );
-        }
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    };
-    fetchData();
-
-    return () => {
-      ignore = true;
-    };
-  }, [search, catFilter]);
+  const equipment = data || [];
 
   return (
     <Container className="mt-4">
-      <h2 className="mb-3">Equipment Catalog</h2>
+      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 className="mb-0">Equipment Catalog</h2>
+        <small className="text-muted">
+          <span className="live-dot me-2" />
+          Live · updated {lastUpdated ? lastUpdated.toLocaleTimeString() : '—'}
+        </small>
+      </div>
 
       <div className="d-flex flex-wrap gap-2 mb-4">
         <InputGroup style={{ maxWidth: 300 }}>
@@ -96,7 +78,7 @@ const EquipmentCatalog = () => {
                     style={{ height: 200, objectFit: 'cover' }}
                   />
                 )}
-                <Card.Body>
+                <Card.Body className="d-flex flex-column">
                   <div className="d-flex justify-content-between align-items-start mb-2">
                     <Card.Title className="mb-0">{item.name}</Card.Title>
                     <Badge bg="secondary">{categoryEmojis[item.category]} {item.category}</Badge>

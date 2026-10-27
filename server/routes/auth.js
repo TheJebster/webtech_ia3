@@ -105,6 +105,56 @@ router.get('/me', protect, async (req, res) => {
   });
 });
 
+// PUT /api/auth/profile
+// Lets a signed-in user update their own name and email.
+router.put(
+  '/profile',
+  protect,
+  [
+    body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
+    body('email').optional().isEmail().withMessage('Valid email is required'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ message: errors.array()[0].msg });
+      }
+
+      const user = await User.findById(req.user._id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const { name, email } = req.body;
+
+      if (email && email.toLowerCase() !== user.email) {
+        const existing = await User.findOne({ email });
+        if (existing) {
+          return res.status(400).json({ message: 'Email already registered' });
+        }
+        user.email = email;
+      }
+
+      if (name) user.name = name;
+
+      await user.save();
+
+      res.json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      });
+    } catch (error) {
+      if (error.code === 11000) {
+        return res.status(400).json({ message: 'Email already registered' });
+      }
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
+
 // PUT /api/auth/change-password
 router.put(
   '/change-password',
